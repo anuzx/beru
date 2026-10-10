@@ -8,5 +8,11 @@
   },
   "peerDependencies": {
     "typescript": "^7"
+  },
+  "dependencies": {
+    "@repo/common": "*",
+    "@openrouter/sdk": "^1.4.25",
+    "bullmq": "^6.3.12",
+    "e2b": "^2.55.0"
   }
 }
