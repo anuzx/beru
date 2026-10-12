@@ -3,7 +3,10 @@ import { PINNED_MESSAGE_COUNT } from "../../constants";
 import { openRouter } from "../../config";
 
 async function summarizeMessages(messages: ChatMessages[]) {
+  
+  //1st two messages
   const pinned = messages.slice(0, PINNED_MESSAGE_COUNT);
+  
   const history = messages.slice(PINNED_MESSAGE_COUNT);
 
   if (history.length === 0) {

@@ -1,33 +1,21 @@
-import { config } from "../../env";
 import type {
-  ChatFunctionTool,
   ChatMessages,
   ChatResult,
 } from "@openrouter/sdk/models";
+import { config } from "../../env";
 import { MAX_CONTEXT_TOKENS } from "../../constants";
 import { openRouter } from "../../config";
 import { summarizeMessages } from "./summarize";
-import { getToolResponse } from "../tools/tools";
-
-export const messages: ChatMessages[] = [
-  {
-    role: "system",
-    content: "",
-  },
-  {
-    role: "user",
-    content: "",
-  },
-];
+import type { ToolContext } from "../tools/tools";
 
 async function callLLM(
   messages: ChatMessages[],
-  tools: ChatFunctionTool[],
+  ctx: ToolContext,
 ): Promise<ChatResult> {
   const result = await openRouter.chat.send({
     chatRequest: {
       model: config.model,
-      tools,
+      tools: ctx.tools,
       messages,
       stream: false,
     },
@@ -50,7 +38,7 @@ async function callLLM(
 
 async function runAgent(
   messages: ChatMessages[],
-  tools: ChatFunctionTool[],
+  ctx: ToolContext,
   maxIterations: number,
   label: string,
 ) {
@@ -58,7 +46,7 @@ async function runAgent(
 
   while (iterationCount < maxIterations) {
     iterationCount++;
-    const response = await callLLM(messages, tools);
+    const response = await callLLM(messages, ctx);
     const contextTokens =
       (response.usage?.promptTokens ?? 0) +
       (response.usage?.completionTokens ?? 0);
@@ -78,7 +66,7 @@ async function runAgent(
     }
 
     for (const toolCall of toolCalls) {
-      messages.push(await getToolResponse(toolCall));
+      messages.push(await ctx.getToolResponse(toolCall));
     }
 
     if (contextTokens > MAX_CONTEXT_TOKENS) {

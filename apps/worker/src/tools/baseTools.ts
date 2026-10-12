@@ -1,9 +1,5 @@
-import type {
-  ChatFunctionTool,
-  ChatMessages,
-  ChatToolCall,
-} from "@openrouter/sdk/models";
-import { sbx } from "../safety/sandbox";
+import type { ChatFunctionTool } from "@openrouter/sdk/models";
+import type { Sandbox } from "e2b";
 
 export const baseTools: ChatFunctionTool[] = [
   {
@@ -24,14 +20,16 @@ export const baseTools: ChatFunctionTool[] = [
   },
 ];
 
-export const runBash = async (command: string) => {
-  const result = await sbx.commands.run(command)
+export function createBaseTools(sbx: Sandbox) {
+  const runBash = async (command: string) => {
+    const result = await sbx.commands.run(command);
 
-  return {
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    return {
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    };
   };
-};
 
-
+  return { runBash };
+}
