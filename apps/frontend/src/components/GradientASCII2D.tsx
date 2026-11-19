@@ -150,6 +150,28 @@ interface Click extends Point {
   effect: number;
 }
 
+interface Settings {
+  colors: string[];
+  characters: string;
+  cellSize: number;
+  density: number;
+  glyphOpacity: number;
+  glow: number;
+  flicker: number;
+  softness: number;
+  scale: number;
+  flow: number;
+  speed: number;
+  gradientOpacity: number;
+  grain: number;
+  mouseInteraction: boolean;
+  scrambleRadius: number;
+  clickEffect: GradientASCIIProps['clickEffect'];
+  intro: boolean;
+  fontFamily: string;
+  dpr?: number;
+}
+
 const GradientASCII2D = (props: GradientASCIIProps) => {
   const {
     colors = DEFAULT_COLORS,
@@ -175,20 +197,66 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
     style,
   } = props;
 
+  const settings: Settings = {
+    colors: (colors.length > 1 ? colors : [colors[0], colors[0]]).slice(0, 8),
+    characters: characters || DEFAULT_CHARACTERS,
+    cellSize,
+    density,
+    glyphOpacity,
+    glow,
+    flicker,
+    softness,
+    scale,
+    flow,
+    speed,
+    gradientOpacity,
+    grain,
+    mouseInteraction,
+    scrambleRadius,
+    clickEffect,
+    intro,
+    fontFamily: fontFamily || DEFAULT_FONT,
+    dpr,
+  };
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wakeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    const {
+      colors,
+      characters,
+      cellSize,
+      density,
+      glyphOpacity,
+      glow,
+      flicker,
+      softness,
+      scale,
+      flow,
+      speed,
+      gradientOpacity,
+      grain,
+      mouseInteraction,
+      scrambleRadius,
+      clickEffect,
+      intro,
+      fontFamily,
+      dpr,
+    } = settingsRef.current;
+
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (!container || !canvas) return undefined;
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return undefined;
 
-    const ramp = (colors.length > 1 ? colors : [colors[0], colors[0]])
-      .slice(0, 8)
-      .map(value => toLab(parseColor(value)));
+    const ramp = colors.map(value => toLab(parseColor(value)));
     const last = ramp.length - 1;
 
     const glyphs = [...new Set([...characters].filter(char => char !== '\n' && char !== '\r'))];
@@ -201,12 +269,9 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
     const seedY = Math.random() * 8;
 
     const wash = document.createElement('canvas');
+    (window as unknown as { __wash?: HTMLCanvasElement }).__wash = wash;
     const washCtx = wash.getContext('2d');
-    const glyphLayer = document.createElement('canvas');
-    const glyphCtx = glyphLayer.getContext('2d');
-    const glowLayer = document.createElement('canvas');
-    const glowCtx = glowLayer.getContext('2d');
-    if (!washCtx || !glyphCtx || !glowCtx) return undefined;
+    if (!washCtx) return undefined;
 
     let width = 1;
     let height = 1;
@@ -222,11 +287,13 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
     let level = new Float32Array(0);
     let washImage: ImageData | null = null;
     let washClock = 0;
+    let grainDots = new Float32Array(0);
+    let lastTick = -1;
     let time = 0;
     let glyphTime = 0;
+    const startedAt = performance.now();
     let introClock = reduce || !intro ? 1 : 0;
     let lastFrame = 0;
-    let accumulator = 0;
     let drawn = false;
     let raf = 0;
     let visible = true;
@@ -254,7 +321,7 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
     };
 
     const toneAt = (t: number): Tone => {
-      const x = smoothstep(0.3, 1, t) * last;
+      const x = smoothstep(0.3, 1, t) ** 1.45 * last;
       const index = Math.min(last, Math.floor(x));
       const next = Math.min(last, index + 1);
       const f = x - Math.floor(x);
@@ -309,10 +376,13 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
       ];
       const alpha = mix(a.alpha, b.alpha, shape) * reveal;
       const linear = labToRgb(lab);
+      // Cheap stand-in for the shader's bloom pass: a soft additive lift that
+      // follows the field alpha, so the glyph field keeps its hazy glow.
+      const lift = 0.08 * glow * alpha;
       const rgb: RGB = [
-        clamp01(encode(linear[0])),
-        clamp01(encode(linear[1])),
-        clamp01(encode(linear[2])),
+        clamp01(encode(linear[0]) + lift),
+        clamp01(encode(linear[1]) + lift),
+        clamp01(encode(linear[2]) + lift),
       ];
       return { rgb, alpha, value: luma(rgb) * alpha, order };
     };
@@ -334,9 +404,9 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
           let field = sample(u, v, 1);
           if (introClock < 1) field = sample(u, v, revealAt(field.order));
           const i = (y * w + x) * 4;
-          data[i] = Math.round(clamp01(field.rgb[0] * field.alpha) * 255);
-          data[i + 1] = Math.round(clamp01(field.rgb[1] * field.alpha) * 255);
-          data[i + 2] = Math.round(clamp01(field.rgb[2] * field.alpha) * 255);
+          data[i] = Math.round(clamp01(field.rgb[0] * field.alpha * gradientOpacity) * 255);
+          data[i + 1] = Math.round(clamp01(field.rgb[1] * field.alpha * gradientOpacity) * 255);
+          data[i + 2] = Math.round(clamp01(field.rgb[2] * field.alpha * gradientOpacity) * 255);
           data[i + 3] = 255;
         }
       }
@@ -376,11 +446,11 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
       return scramble;
     };
 
-    const renderGlyphs = () => {
-      glyphCtx.clearRect(0, 0, width, height);
-      glyphCtx.font = `300 ${Math.round(cellHeight * 0.78)}px ${fontFamily}`;
-      glyphCtx.textAlign = 'center';
-      glyphCtx.textBaseline = 'middle';
+    const renderGlyphs = (target: CanvasRenderingContext2D) => {
+      target.globalCompositeOperation = 'lighter';
+      target.font = `300 ${Math.round(cellHeight * 0.78)}px ${fontFamily}`;
+      target.textAlign = 'center';
+      target.textBaseline = 'middle';
 
       const frame = Math.floor(glyphTime * 20);
       const flip = Math.floor(glyphTime * 9);
@@ -430,73 +500,41 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
             field.rgb[1] * field.alpha * 0.55 + 0.03 * field.alpha,
             field.rgb[2] * field.alpha * 0.55 + 0.03 * field.alpha,
           ];
-          glyphCtx.fillStyle = styleFor(light[0], light[1], light[2], alpha);
-          glyphCtx.fillText(char, cx, cy);
+          target.fillStyle = styleFor(light[0], light[1], light[2], alpha);
+          target.fillText(char, cx, cy);
         }
       }
     };
 
     const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.save();
-      ctx.globalAlpha = gradientOpacity;
+      // The wash is an opaque, full-bleed image, so no clear is needed.
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(wash, 0, 0, width, height);
-      ctx.restore();
-
-      renderGlyphs();
 
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(glyphLayer, 0, 0, width, height);
+      renderGlyphs(ctx);
       ctx.restore();
 
-      if (glow > 0.001) {
-        glowCtx.clearRect(0, 0, glowLayer.width, glowLayer.height);
-        glowCtx.drawImage(glyphLayer, 0, 0, glowLayer.width, glowLayer.height);
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = Math.min(0.7, glow * 0.55);
-        ctx.imageSmoothingEnabled = true;
-        ctx.filter = 'blur(3px)';
-        ctx.drawImage(glowLayer, 0, 0, width, height);
-        ctx.filter = 'none';
-        ctx.restore();
-      }
-
       if (grain > 0.001 && !reduce) {
-        const dots = Math.round(clamp01(grain / 0.4) * 900);
         ctx.save();
-        for (let i = 0; i < dots; i++) {
-          const nx = hash12(i * 1.37 + frameSeed, i * 2.11 + 0.5);
-          const ny = hash12(i * 3.71 + 9.2, i * 0.9 + frameSeed);
-          const a = hash12(i, frameSeed) * 0.08;
-          ctx.fillStyle = `rgba(207,226,255,${a.toFixed(3)})`;
-          ctx.fillRect(nx * width, ny * height, 1, 1);
+        ctx.fillStyle = `rgba(207,226,255,${(0.04 * clamp01(grain / 0.08)).toFixed(3)})`;
+        for (let i = 0; i < grainDots.length; i += 2) {
+          ctx.fillRect(grainDots[i] * width, grainDots[i + 1] * height, 1, 1);
         }
         ctx.restore();
       }
     };
 
-    let frameSeed = 0;
-
     const resize = () => {
       width = Math.max(1, container.clientWidth);
       height = Math.max(1, container.clientHeight);
       aspect = width / height;
-      ratio = Math.min(dpr || window.devicePixelRatio || 1, 2);
+      ratio = Math.min(dpr || window.devicePixelRatio || 1, 1.5);
 
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-      glyphLayer.width = canvas.width;
-      glyphLayer.height = canvas.height;
-      glyphCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-      glowLayer.width = Math.max(1, Math.ceil(width / 4));
-      glowLayer.height = Math.max(1, Math.ceil(height / 4));
 
       cellHeight = clamp(cellSize, 6, 64);
       cellWidth = cellHeight * 0.6;
@@ -513,6 +551,12 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
           pick[i] = hash12(col + 4.1, row + 9.7);
           level[i] = hash12(col * 1.73 + 4.1, row * 1.73 + 4.1);
         }
+      }
+
+      grainDots = new Float32Array(800);
+      for (let i = 0; i < 400; i++) {
+        grainDots[i * 2] = hash12(i * 1.37 + 3.3, i * 2.11 + 0.5);
+        grainDots[i * 2 + 1] = hash12(i * 3.71 + 9.2, i * 0.9 + 7.1);
       }
 
       const washWidth = Math.max(96, Math.round(width / 8));
@@ -544,27 +588,30 @@ const GradientASCII2D = (props: GradientASCIIProps) => {
       const dt = lastFrame ? clamp((now - lastFrame) / 1000, 0.001, 0.05) : 1 / 60;
       lastFrame = now;
       if (!reduce) {
-        time += dt * speed * 0.5;
-        glyphTime += dt * Math.max(speed, 0.15);
+        // Wall-clock based so the animation pace matches the shader version
+        // regardless of the frame rate.
+        const elapsed = (now - startedAt) / 1000;
+        time = elapsed * speed * 0.5;
+        glyphTime = elapsed * Math.max(speed, 0.15);
       }
       if (introClock < 1) introClock = Math.min(1, introClock + dt / INTRO_SECONDS);
       updateInput(dt);
-      frameSeed = (frameSeed + 1) % 997;
 
-      accumulator += dt;
-      if (!drawn || accumulator >= 1 / 30 || introClock < 1) {
-        accumulator = 0;
-        drawn = true;
-        washClock += dt;
-        if (washClock > 0.12) {
+      washClock += dt;
+      const tick = Math.floor(glyphTime * 9);
+      const busy = introClock < 1 || clicks.length > 0 || trail.length > 0;
+      if (!drawn || busy || washClock >= 0.08 || tick !== lastTick) {
+        lastTick = tick;
+        if (washClock >= 0.08) {
           washClock = 0;
           updateWash();
         }
         render();
+        drawn = true;
       }
 
-      const busy = !reduce || introClock < 1 || clicks.length > 0 || trail.length > 0;
-      if (busy) {
+      const animate = !reduce || introClock < 1 || clicks.length > 0 || trail.length > 0;
+      if (animate) {
         raf = requestAnimationFrame(frame);
       } else {
         lastFrame = 0;

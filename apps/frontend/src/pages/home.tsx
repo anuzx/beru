@@ -2,7 +2,7 @@ import { CtaSection } from "@/components/cta-section"
 import { Features } from "@/components/features"
 import { Hero } from "@/components/hero"
 import { HowItWorks } from "@/components/how-it-works"
-import { SiteFooter } from "@/components/site-footer"
+import Footer from "@/components/shadcn-studio/blocks/footer-component-01/footer-component-01"
 import { SiteHeader } from "@/components/site-header"
 
 export default function Home() {
@@ -15,7 +15,7 @@ export default function Home() {
         <Features />
         <CtaSection />
       </main>
-      <SiteFooter />
+      <Footer />
     </div>
   )
 }

@@ -227,7 +227,7 @@ vec3 eclipse(vec2 p, float time, out float order) {
 }
 
 vec4 tone(float t) {
-  float x = smoothstep(0.3, 1.0, t) * float(uCount - 1);
+  float x = pow(smoothstep(0.3, 1.0, t), 1.45) * float(uCount - 1);
   int index = int(floor(x));
   return vec4(mix(uRamp[index], uRamp[min(index + 1, uCount - 1)], fract(x)), smoothstep(0.0, 0.38, t));
 }

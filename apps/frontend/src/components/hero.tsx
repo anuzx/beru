@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
 import GradientASCII from "@/components/GradientASCII";
 import GradientASCII2D from "@/components/GradientASCII2D";
@@ -8,7 +8,7 @@ import { TaskConsole } from "@/components/task-console";
 import { Button } from "@/components/ui/button";
 
 const asciiProps: GradientASCIIProps = {
-  colors: ["#05070d", "#0a1636", "#1645a5", "#3f83ff", "#a9cbff"],
+  colors: ["#04060c", "#081633", "#0f3a86", "#2260c4", "#a9cbff"],
   characters: " =+xX0S8#@",
   cellSize: 16,
   density: 0.85,
@@ -29,7 +29,7 @@ const asciiProps: GradientASCIIProps = {
 export function Hero() {
   // Client-only app, so probing WebGL2 during the first render is safe.
   const [hasWebGL2] = useState(() =>
-    Boolean(document.createElement("canvas").getContext("webgl2"))
+    Boolean(document.createElement("canvas").getContext("webgl2")),
   );
 
   return (
@@ -58,22 +58,20 @@ export function Hero() {
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 text-center sm:px-6">
         <h1 className="hero-in hero-in-2 mx-auto mt-2 max-w-4xl text-balance text-5xl font-semibold leading-[1.04] tracking-tight sm:text-6xl lg:text-[76px]">
-          Give it a repo.
+          Your team's autonomous
           <br />
-          <span className="text-gradient-mono">Get a pull request.</span>
+          <span className="text-gradient-mono">software engineer</span>
         </h1>
 
         <p className="hero-in hero-in-3 mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-neutral-300 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)] sm:text-lg">
-          Beru takes a GitHub link and a plain-English task, works inside an
-          isolated sandbox, and ships a review-ready PR. You describe the change
-          it handles the rest.
+          Beru runs in the cloud inside an isolated sandbox, tests all the edge
+          cases, and won't stop until the PR is ready to merge
         </p>
 
         <div className="hero-in hero-in-4 mt-9 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="h-11 rounded-full px-6">
             <Link to="/signup">
               Start building free
-              <ArrowRight className="size-4" />
             </Link>
           </Button>
           <Button
