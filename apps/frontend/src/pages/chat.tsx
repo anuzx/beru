@@ -5,7 +5,15 @@ import {
   Plus,
   X,
 } from "lucide-react"
-import { Suspense, lazy, type FormEvent, useEffect, useState } from "react"
+import { Suspense, lazy, type FormEvent, useEffect, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import {
+  ApiRequestError,
+  fetchMe,
+  saveInstallation,
+  signOut,
+  type AuthUser,
+} from "@/api/auth"
 import { ChatSidebar, type ChatSession } from "@/components/chat-sidebar"
 import { AiPromptBar } from "@/components/ui/ai-prompt-bar"
 import {
@@ -122,9 +130,55 @@ export default function Chat() {
   const [trace, setTrace] = useState<TraceEntry[]>([])
   const [isOrchestrating, setIsOrchestrating] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [account, setAccount] = useState<AuthUser | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const handledInstallation = useRef(false)
 
   const hasStarted = trace.length > 0 || messages.length > 0
   const diff = trace.find((step) => step.diff)?.diff
+
+  // GitHub redirects back here after installation with `?installation_id=...`.
+  // Persist it against the signed-in user, then drop it from the URL.
+  useEffect(() => {
+    const installationId = searchParams.get("installation_id")
+    if (!installationId || handledInstallation.current) return
+    handledInstallation.current = true
+
+    saveInstallation(installationId)
+      .catch((cause) => {
+        setNotice(
+          cause instanceof ApiRequestError
+            ? cause.message
+            : "Could not save your GitHub App installation",
+        )
+      })
+      .finally(() => {
+        const next = new URLSearchParams(searchParams)
+        next.delete("installation_id")
+        next.delete("setup_action")
+        next.delete("state")
+        setSearchParams(next, { replace: true })
+      })
+  }, [searchParams, setSearchParams])
+
+  // Load the signed-in user (also verifies the stored token).
+  useEffect(() => {
+    fetchMe()
+      .then((result) => setAccount(result.user))
+      .catch((cause) => {
+        if (cause instanceof ApiRequestError && cause.status === 401) {
+          navigate("/signin", { replace: true })
+        }
+      })
+  }, [navigate])
+
+  function handleSignOut() {
+    signOut()
+    navigate("/signin", { replace: true })
+  }
 
   // Walk the stubbed orchestration once the prompt is sent.
   useEffect(() => {
@@ -231,6 +285,28 @@ export default function Chat() {
       />
 
       <main className="flex min-h-0 flex-1 flex-col px-4">
+        <div className="flex min-h-14 items-center justify-end gap-3">
+          {notice && (
+            <p role="alert" className="mr-auto font-mono text-xs text-red-400">
+              {notice}
+            </p>
+          )}
+
+          {account && (
+            <span className="font-mono text-xs text-neutral-500">
+              @{account.username}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="rounded-xs border border-neutral-800 bg-[rgb(31,31,32)] px-2.5 py-1 font-sans text-xs text-neutral-300 transition-colors hover:bg-[rgb(38,38,40)] hover:text-white"
+          >
+            Sign out
+          </button>
+        </div>
+
         <div
           className={cn(
             "mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-6 px-1 transition-all duration-500 ease-out",

@@ -1,12 +1,12 @@
 import type { ChatMessages } from "@openrouter/sdk/models";
 import { PINNED_MESSAGE_COUNT } from "../../constants";
 import { openRouter } from "../../config";
+import { config } from "../../env";
 
 async function summarizeMessages(messages: ChatMessages[]) {
-  
   //1st two messages
   const pinned = messages.slice(0, PINNED_MESSAGE_COUNT);
-  
+
   const history = messages.slice(PINNED_MESSAGE_COUNT);
 
   if (history.length === 0) {
@@ -15,10 +15,10 @@ async function summarizeMessages(messages: ChatMessages[]) {
 
   console.log(`Summarizing ${history.length} messages...`);
 
-  //simple llm call for summarization
+  /*simple llm call for summarization*/
   const result = await openRouter.chat.send({
     chatRequest: {
-      model: "google/gemini-3-flash-preview",
+      model: config.model,
       messages: [
         {
           role: "system",

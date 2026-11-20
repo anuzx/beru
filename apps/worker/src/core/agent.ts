@@ -1,13 +1,13 @@
-import type {
-  ChatMessages,
-  ChatResult,
-} from "@openrouter/sdk/models";
+import type { ChatMessages, ChatResult } from "@openrouter/sdk/models";
 import { config } from "../../env";
 import { MAX_CONTEXT_TOKENS } from "../../constants";
 import { openRouter } from "../../config";
 import { summarizeMessages } from "./summarize";
 import type { ToolContext } from "../tools/tools";
 
+/*
+callLLM function: use to talk to llms
+*/
 async function callLLM(
   messages: ChatMessages[],
   ctx: ToolContext,
@@ -36,6 +36,9 @@ async function callLLM(
   return result;
 }
 
+/*
+  run agent function: call it to run the agent loop
+*/
 async function runAgent(
   messages: ChatMessages[],
   ctx: ToolContext,

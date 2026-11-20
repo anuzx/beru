@@ -10,10 +10,11 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "@openrouter/sdk": "^1.4.25",
     "@repo/common": "*",
     "@repo/github": "*",
-    "@openrouter/sdk": "^1.4.25",
     "bullmq": "^6.3.12",
-    "e2b": "^2.55.0"
+    "e2b": "^2.55.0",
+    "ioredis": "^6.0.0"
   }
 }

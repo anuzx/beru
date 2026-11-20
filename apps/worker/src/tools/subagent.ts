@@ -8,7 +8,7 @@ export const subAgentTool: ChatFunctionTool = {
   function: {
     name: "sub_agent",
     description:
-      "Delegate a difficult, self-contained task (deep investigation, multi-step analysis, tracing logic across many files) to a sub-agent. The sub-agent has its own fresh context and the same bash/read_file tools, but cannot see this conversation, so describe the task and any relevant context fully. Returns the sub-agent's final report.",
+      "Delegate a difficult, self-contained task (deep investigation, multi-step analysis, tracing logic across many files) to a sub-agent. The sub-agent has its own fresh context and the same bash tool, but cannot see this conversation, so describe the task and any relevant context fully. Returns the sub-agent's final report.",
     parameters: {
       type: "object",
       properties: {

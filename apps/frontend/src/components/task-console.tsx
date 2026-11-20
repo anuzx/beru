@@ -3,7 +3,7 @@ import { GithubIcon } from "@/components/icons"
 import { cn } from "@/lib/utils"
 
 const steps = [
-  { text: "Cloning acme/payments-api into sandbox", done: true },
+  { text: "Cloning anuzx/payments-api into sandbox", done: true },
   { text: "Reading src/webhooks/stripe.handler.ts", done: true },
   { text: "Running test suite — 1 failing", done: true },
   { text: "Patched idempotency key handling", done: true },
@@ -27,7 +27,7 @@ export function TaskConsole({ className }: { className?: string }) {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <GithubIcon className="size-3.5" />
-          <span className="font-mono">acme/payments-api</span>
+          <span className="font-mono">anuzx/payments-api</span>
         </div>
         <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[10px] font-medium text-primary">
           <span className="size-1.5 animate-pulse rounded-full bg-primary" />

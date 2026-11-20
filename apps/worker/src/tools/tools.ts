@@ -4,19 +4,26 @@ import type {
   ChatToolCall,
 } from "@openrouter/sdk/models";
 import type { Sandbox } from "e2b";
+import type { ExecResult } from "./exec";
 import { baseTools, createBaseTools } from "./baseTools";
 import { runSubAgent, subAgentTool } from "./subagent";
 
 export type ToolContext = {
   tools: ChatFunctionTool[];
-  runBash: (command: string) => Promise<{
-    exitCode: number;
-    stdout: string;
-    stderr: string;
-  }>;
+  runBash: (command: string) => Promise<ExecResult>;
   workspace: string;
   getToolResponse: (toolCall: ChatToolCall) => Promise<ChatMessages>;
 };
+
+const TOOL_TIMEOUT_MS = 30_000;
+
+function preview(value: string, maxLength = 200) {
+  const firstLine = value.split("\n")[0]?.trim() ?? value;
+
+  return firstLine.length > maxLength
+    ? `${firstLine.slice(0, maxLength)}...`
+    : firstLine;
+}
 
 export function createToolContext(
   sbx: Sandbox,
@@ -30,17 +37,23 @@ export function createToolContext(
     runBash,
     workspace,
     async getToolResponse(toolCall: ChatToolCall): Promise<ChatMessages> {
+      console.log(`tool call: ${toolCall.function.name}`);
+
       let timer: ReturnType<typeof setTimeout>;
 
-      const timeout = new Promise((resolve) => {
+      const timeout = new Promise<ExecResult>((resolve) => {
         timer = setTimeout(() => {
-          console.log("timeout received");
-          resolve({ stdout: "Timeout while running the tool" });
-        }, 30000);
+          console.log("tool timed out");
+          resolve({
+            exitCode: -1,
+            stdout: "",
+            stderr: `Timeout after ${TOOL_TIMEOUT_MS / 1000}s while running the tool`,
+          });
+        }, TOOL_TIMEOUT_MS);
       });
 
       try {
-        let toolResult;
+        let toolResult: unknown;
 
         switch (toolCall.function.name) {
           case "bash": {
@@ -48,6 +61,7 @@ export function createToolContext(
               command: string;
             };
 
+            console.log(`bash: ${preview(command)}`);
             toolResult = await Promise.race([runBash(command), timeout]);
             break;
           }
@@ -55,12 +69,23 @@ export function createToolContext(
             const { task } = JSON.parse(toolCall.function.arguments) as {
               task: string;
             };
-            console.log(`Tool: SubAgent > ${task}`);
+
+            console.log(`tool: SubAgent > ${preview(task)}`);
             toolResult = await runSubAgent(task, ctx);
             break;
           }
           default:
             throw new Error(`Unknown tool: ${toolCall.function.name}`);
+        }
+
+        if (
+          toolResult &&
+          typeof toolResult === "object" &&
+          "exitCode" in toolResult
+        ) {
+          console.log(
+            `tool finished: ${toolCall.function.name} (exit ${(toolResult as ExecResult).exitCode})`,
+          );
         }
 
         return {

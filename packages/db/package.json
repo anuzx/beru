@@ -1,8 +1,14 @@
 {
   "name": "@repo/db",
   "module": "index.ts",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "studio": "drizzle-kit studio",
+    "check-types": "tsc --noEmit"
+  },
   "exports": {
     ".": "./index.ts"
   },

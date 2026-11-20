@@ -1,9 +1,10 @@
 import type { Job } from "bullmq";
 import {
+  buildCloneUrl,
   createInstallationToken,
+  createPullRequest,
   getAppBotIdentity,
   getRepoDefaultBranch,
-  createPullRequest,
   revokeInstallationToken,
 } from "@repo/github";
 import type { AgentJob } from "@repo/common";
@@ -14,18 +15,42 @@ import { createToolContext } from "./tools/tools";
 import { createMessages } from "./core/messages";
 import { runAgent } from "./core/agent";
 import { setupRepo, commitAndPush } from "./repo";
+import {
+  buildBranchName,
+  buildPrBody,
+  buildPrTitle,
+  detectBranchType,
+  getChangeSummary,
+} from "./pull_request";
 
 export async function runJob(job: Job<AgentJob>) {
   const { owner, repo, installationId, prompt } = job.data;
+  const jobId = job.id ?? "unknown";
 
+  console.log("starting sandbox...");
   const sbx = await createSandbox();
-  const app = await loadGithubApp();
-  const { token } = await createInstallationToken(app, installationId, repo);
+  console.log("sandbox started");
+
+  let token: string | undefined;
 
   try {
-    const identity = await getAppBotIdentity(app, token);
-    const branch = `agent/${job.id}`;
+    console.log("loading github app...");
+    const app = await loadGithubApp();
 
+    console.log("creating installation token...");
+    ({ token } = await createInstallationToken(app, installationId, repo));
+
+    console.log("looking up app bot identity...");
+    const identity = await getAppBotIdentity(app, token);
+
+    const branchType = detectBranchType(prompt);
+    const branch = buildBranchName(prompt, jobId);
+    console.log(`using branch ${branch}`);
+
+    const base = await getRepoDefaultBranch(token, owner, repo);
+    console.log(`base branch is ${base}`);
+
+    console.log(`cloning ${owner}/${repo}...`);
     await setupRepo(sbx, {
       owner,
       repo,
@@ -34,24 +59,56 @@ export async function runJob(job: Job<AgentJob>) {
       branch,
       identity,
     });
+    console.log("repository ready");
 
+    console.log("running agent...");
     const ctx = createToolContext(sbx, WORKSPACE);
     const messages = createMessages({ prompt, workspace: WORKSPACE });
-    const result = await runAgent(messages, ctx, MAX_ITERATIONS, "main");
+    const report = await runAgent(messages, ctx, MAX_ITERATIONS, "main");
+    console.log("agent finished");
 
-    await commitAndPush(sbx, WORKSPACE, branch, `Agent changes for job ${job.id}`);
+    console.log("committing and pushing changes...");
+    await commitAndPush(sbx, {
+      workspace: WORKSPACE,
+      branch,
+      message: `Agent changes for job ${jobId}`,
+      base,
+      pushUrl: buildCloneUrl(token, owner, repo),
+      token,
+    });
+    console.log("changes pushed");
 
-    const base = await getRepoDefaultBranch(token, owner, repo);
+    console.log("collecting change summary...");
+    const changes = await getChangeSummary(sbx, WORKSPACE, base);
+
+    console.log("creating pull request...");
     const pr = await createPullRequest(token, owner, repo, {
-      title: `Agent: ${prompt.slice(0, 60)}`,
+      title: buildPrTitle({ prompt, report, type: branchType }),
       head: branch,
       base,
-      body: typeof result === "string" ? result : "Automated changes by the agent.",
+      body: buildPrBody({
+        prompt,
+        report,
+        ...changes,
+        branch,
+        jobId,
+      }),
     });
+    console.log(`pull request created: ${pr.htmlUrl}`);
 
     return { prUrl: pr.htmlUrl, branch };
   } finally {
+    console.log("cleaning up...");
+
+    if (token) {
+      await revokeInstallationToken(token).catch((error) => {
+        console.error(
+          "failed to revoke installation token:",
+          error instanceof Error ? error.message : error,
+        );
+      });
+    }
+
     await sbx.kill();
-    await revokeInstallationToken(token);
   }
 }
